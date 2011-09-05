@@ -286,3 +286,25 @@ int uv_process_kill(uv_process_t* process, int signum) {
     return 0;
   }
 }
+
+int uv_spawn_sync(uv_loop_t* loop, uv_sync_process_t* process,
+    uv_sync_process_options_t options) {
+
+  pid_t pid;
+
+  switch (pid = fork()) {
+    case -1:
+      perror("fork");
+      return -1;
+
+    case 0: /* Child */
+      execvp(options.file, options.args);
+      perror("execvp()");
+      _exit(127);
+      break;
+  }
+
+  process->pid = pid;
+
+  return 0;
+}

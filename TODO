@@ -1,0 +1,5 @@
+* Define interface
+
+* uv_spawn_sync(loop, process, options)
+
+* Use pid_t for normal spawn process type (uv.h)

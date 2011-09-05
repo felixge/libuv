@@ -72,6 +72,7 @@ TEST_DECLARE   (spawn_exit_code)
 TEST_DECLARE   (spawn_stdout)
 TEST_DECLARE   (spawn_stdin)
 TEST_DECLARE   (spawn_and_kill)
+TEST_DECLARE   (spawn_sync_exit_code)
 TEST_DECLARE   (fs_file_noent)
 TEST_DECLARE   (fs_file_async)
 TEST_DECLARE   (fs_file_sync)
@@ -177,6 +178,8 @@ TASK_LIST_START
   TEST_ENTRY  (spawn_stdout)
   TEST_ENTRY  (spawn_stdin)
   TEST_ENTRY  (spawn_and_kill)
+
+  TEST_ENTRY  (spawn_sync_exit_code)
 #ifdef _WIN32
   TEST_ENTRY  (spawn_detect_pipe_name_collisions_on_windows)
   TEST_ENTRY  (argument_escaping)

@@ -56,6 +56,7 @@ typedef struct uv_idle_s uv_idle_t;
 typedef struct uv_async_s uv_async_t;
 typedef struct uv_getaddrinfo_s uv_getaddrinfo_t;
 typedef struct uv_process_s uv_process_t;
+typedef struct uv_sync_process_s uv_sync_process_t;
 typedef struct uv_counters_s uv_counters_t;
 /* Request types */
 typedef struct uv_req_s uv_req_t;
@@ -813,6 +814,28 @@ struct uv_process_s {
 
 /* Initializes uv_process_t and starts the process. */
 int uv_spawn(uv_loop_t*, uv_process_t*, uv_process_options_t options);
+
+/* uv_spawn_sync() options */
+typedef struct uv_sync_process_options_s {
+  const char* file; /* Path to program to execute. */
+  /*
+   * Command line arguments. args[0] should be the path to the program.
+   */
+  char** args;
+} uv_sync_process_options_t;
+
+/*
+ * uv_process_t is not a subclass of uv_handle_t
+ */
+struct uv_sync_process_s {
+  pid_t pid;
+  int exit_code;
+};
+
+/* Initializes uv_sync_process_t and executes the process. */
+int uv_spawn_sync(uv_loop_t*, uv_sync_process_t*,
+    uv_sync_process_options_t options);
+
 
 /*
  * Kills the process with the specified signal. The user must still
