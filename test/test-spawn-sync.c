@@ -157,6 +157,40 @@ TEST_IMPL(spawn_sync_stderr) {
   return 0;
 }
 
+TEST_IMPL(spawn_sync_stdout_overflow) {
+  int r;
+  uv_init();
+
+  init_process_options("stdout_stderr");
+
+  spawn.stdout_size = 1;
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(spawn.stdout_read == spawn.stdout_size);
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_stderr_overflow) {
+  int r;
+  uv_init();
+
+  init_process_options("stdout_stderr");
+
+  spawn.stderr_size = 1;
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(spawn.stderr_read == spawn.stderr_size);
+
+  return 0;
+}
+
 TEST_IMPL(spawn_sync_combine_stdio) {
   int r;
   char *expected_stdout = "stdout\nstderr\n";
