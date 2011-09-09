@@ -1,5 +1,3 @@
-* Define interface
+* Do another read after SIGCHLD
 
-* uv_spawn_sync(loop, process, options)
-
-* Use pid_t for normal spawn process type (uv.h)
+* Clean up code
