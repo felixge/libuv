@@ -344,6 +344,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
         if (spawn->combine) {
           dup2(stdout_pipe[1], STDERR_FILENO);
+          assert(!spawn->stderr_buf);
         }
       }
 
