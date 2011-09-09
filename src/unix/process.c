@@ -319,23 +319,23 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   spawn->stderr_read = 0;
 
   if (spawn->stdout_buf && pipe(stdout_pipe)) {
-    perror("pipe");
+    uv_err_new(loop, errno); /* pipe error */
     return -1;
   }
 
   if (spawn->stderr_buf && pipe(stderr_pipe)) {
-    perror("pipe");
+    uv_err_new(loop, errno); /* pipe error */
     return -1;
   }
 
   if (pipe(sigchld_pipe)) {
-    perror("pipe");
+    uv_err_new(loop, errno); /* pipe error */
     return -1;
   }
 
   switch (spawn->pid = fork()) {
     case -1:
-      perror("fork");
+      uv_err_new(loop, errno); /* fork error */
       return -1;
 
     case 0: /* child */
@@ -355,7 +355,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       }
 
       execvp(spawn->file, spawn->args);
-      perror("execvp()");
+      uv_err_new(loop, errno); /* execvp error */
       _exit(127);
       break;
   }
@@ -382,7 +382,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   siga.sa_mask = sigset;
   siga.sa_flags = 0;
   if (sigaction(SIGCHLD, &siga, (struct sigaction *)NULL) != 0) {
-    perror("sigaction");
+    uv_err_new(loop, errno); /* sigaction error */
     goto error;
   }
 
@@ -416,7 +416,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
         continue;
       }
 
-      perror("select");
+      uv_err_new(loop, errno); /* select error */
       goto error;
     }
 
@@ -449,7 +449,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
       /* @TODO HANDLE EAGAIN / EINTR */
       if (r == -1) {
-        perror("read");
+        uv_err_new(loop, errno); /* read error */
         goto error;
       }
 
@@ -465,7 +465,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
       r = read(stderr_pipe[0], spawn->stderr_buf + spawn->stderr_read, spawn->stderr_size - spawn->stderr_read);
       if (r == -1) {
-        perror("read");
+        uv_err_new(loop, errno); /* read error */
         goto error;
       }
 
@@ -478,7 +478,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
       pid_t p = wait(&status);
       if (p < 0) {
-        perror("wait");
+        uv_err_new(loop, errno); /* wait error */
         goto error;
       }
 
