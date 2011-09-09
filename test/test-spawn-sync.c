@@ -56,6 +56,9 @@ void debug(int r) {
   fprintf(stderr, "spawn.stdout_read: %i\n", spawn.stdout_read);
   fprintf(stderr, "spawn.stdout_size: %i\n", spawn.stdout_size);
   fprintf(stderr, "spawn.stdout: %s\n", spawn.stdout_buf);
+  fprintf(stderr, "spawn.stderr_read: %i\n", spawn.stderr_read);
+  fprintf(stderr, "spawn.stderr_size: %i\n", spawn.stderr_size);
+  fprintf(stderr, "spawn.stderr: %s\n", spawn.stderr_buf);
   fprintf(stderr, "spawn.exit_code: %i\n", spawn.exit_code);
   fprintf(stderr, "spawn.exit_signal: %i\n", spawn.exit_signal);
 }
@@ -108,6 +111,48 @@ TEST_IMPL(spawn_sync_stdio) {
   ASSERT(strcmp(spawn.stderr_buf, expected_stderr) == 0);
   ASSERT(spawn.stdout_read == strlen(expected_stdout));
   ASSERT(spawn.stderr_read == strlen(expected_stderr));
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_stdout) {
+  int r;
+  char *expected_stdout = "stdout\n";
+  uv_init();
+
+  init_process_options("stdout_stderr");
+
+  spawn.stderr_buf = NULL;
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(strcmp(spawn.stdout_buf, expected_stdout) == 0);
+  ASSERT(spawn.stdout_read == strlen(expected_stdout));
+  ASSERT(spawn.stderr_read == 0);
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_stderr) {
+  int r;
+  char *expected_stderr = "stderr\n";
+  uv_init();
+
+  init_process_options("stdout_stderr");
+
+  spawn.stdout_buf = NULL;
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(strcmp(spawn.stderr_buf, expected_stderr) == 0);
+  ASSERT(spawn.stderr_read == strlen(expected_stderr));
+  ASSERT(spawn.stdout_read == 0);
 
   return 0;
 }

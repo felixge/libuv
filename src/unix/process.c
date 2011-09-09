@@ -315,13 +315,14 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   spawn->exit_code = -1;
   spawn->exit_signal = -1;
   spawn->stdout_read = 0;
+  spawn->stderr_read = 0;
 
-  if (pipe(stdout_pipe)) {
+  if (spawn->stdout_buf && pipe(stdout_pipe)) {
     perror("pipe");
     return -1;
   }
 
-  if (pipe(stderr_pipe)) {
+  if (spawn->stderr_buf && pipe(stderr_pipe)) {
     perror("pipe");
     return -1;
   }
@@ -337,14 +338,17 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       return -1;
 
     case 0: /* child */
-       /* close read ends */
-      close(stdout_pipe[0]);
-      close(stderr_pipe[0]);
+      if (spawn->stdout_buf) {
+        close(stdout_pipe[0]); /* close read end */
+        dup2(stdout_pipe[1], STDOUT_FILENO);
 
-      dup2(stdout_pipe[1], STDOUT_FILENO);
-      if (spawn->combine) {
-        dup2(stdout_pipe[1], STDERR_FILENO);
-      } else {
+        if (spawn->combine) {
+          dup2(stdout_pipe[1], STDERR_FILENO);
+        }
+      }
+
+      if (spawn->stderr_buf) {
+        close(stderr_pipe[0]); /* close read end */
         dup2(stderr_pipe[1], STDERR_FILENO);
       }
 
@@ -355,11 +359,19 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   }
 
   /* parent */
-  /* close the write ends */
-  close(stdout_pipe[1]);
-  close(stderr_pipe[1]);
+  nfds = spawn_sync_pipe[0];
 
-  nfds = MAX(MAX(stdout_pipe[0], stderr_pipe[0]), spawn_sync_pipe[0]) + 1;
+  if (spawn->stdout_buf) {
+    close(stdout_pipe[1]); /* close the write end */
+    nfds = MAX(nfds, stdout_pipe[0]);
+  }
+
+  if (spawn->stderr_buf) {
+    close(stderr_pipe[1]); /* close the write end */
+    nfds = MAX(nfds, stderr_pipe[0]);
+  }
+
+  nfds = nfds + 1;
   start_time = uv_now(loop); /* time in ms */
 
   /* Set up sighandling */
@@ -378,8 +390,15 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
     int r;
 
     FD_ZERO(&pipes);
-    FD_SET(stdout_pipe[0], &pipes);
-    FD_SET(stderr_pipe[0], &pipes);
+
+    if (spawn->stdout_buf) {
+      FD_SET(stdout_pipe[0], &pipes);
+    }
+
+    if (spawn->stderr_buf) {
+      FD_SET(stderr_pipe[0], &pipes);
+    }
+
     FD_SET(spawn_sync_pipe[0], &pipes);
 
     elapsed = uv_now(loop) - start_time;
@@ -403,14 +422,21 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       /* timeout */
       close(spawn_sync_pipe[0]);
       close(spawn_sync_pipe[1]);
-      close(stdout_pipe[0]);
-      close(stderr_pipe[0]);
+
+      if (spawn->stdout_buf) {
+        close(stdout_pipe[0]);
+      }
+
+      if (spawn->stderr_buf) {
+        close(stderr_pipe[0]);
+      }
+
       kill(spawn->pid, SIGKILL);
       perror("timeout");
       return -1;
     }
 
-    if (FD_ISSET(stdout_pipe[0], &pipes)) {
+    if (spawn->stdout_buf && FD_ISSET(stdout_pipe[0], &pipes)) {
       /* Check for buffer overflow. */
       if (spawn->stdout_size - spawn->stdout_read <= 0) {
         perror("buffer overflow");
@@ -425,7 +451,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       spawn->stdout_read += r;
     }
 
-    if (FD_ISSET(stderr_pipe[0], &pipes)) {
+    if (spawn->stderr_buf && FD_ISSET(stderr_pipe[0], &pipes)) {
       /* Check for buffer overflow. */
       if (spawn->stderr_size - spawn->stderr_read <= 0) {
         perror("buffer overflow");
@@ -452,8 +478,14 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
       close(spawn_sync_pipe[0]);
       close(spawn_sync_pipe[1]);
-      close(stdout_pipe[0]);
-      close(stderr_pipe[0]);
+
+      if (spawn->stdout_buf) {
+        close(stdout_pipe[0]);
+      }
+
+      if (spawn->stderr_buf) {
+        close(stderr_pipe[0]);
+      }
 
       if (WIFEXITED(status)) {
         spawn->exit_code = WEXITSTATUS(status);
@@ -472,8 +504,15 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 error:
   close(spawn_sync_pipe[0]);
   close(spawn_sync_pipe[1]);
-  close(stdout_pipe[0]);
-  close(stderr_pipe[0]);
+
+  if (spawn->stdout_buf) {
+    close(stdout_pipe[0]);
+  }
+
+  if (spawn->stderr_buf) {
+    close(stderr_pipe[0]);
+  }
+
   kill(spawn->pid, SIGKILL);
   return -1;
 }
