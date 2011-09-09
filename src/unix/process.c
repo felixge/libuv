@@ -342,7 +342,11 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       close(stderr_pipe[0]);
 
       dup2(stdout_pipe[1], STDOUT_FILENO);
-      dup2(stderr_pipe[1], STDERR_FILENO);
+      if (spawn->combine) {
+        dup2(stdout_pipe[1], STDERR_FILENO);
+      } else {
+        dup2(stderr_pipe[1], STDERR_FILENO);
+      }
 
       execvp(spawn->file, spawn->args);
       perror("execvp()");
