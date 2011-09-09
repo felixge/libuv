@@ -164,6 +164,7 @@ TEST_IMPL(spawn_sync_combine_stdio) {
 
   init_process_options("stdout_stderr");
 
+  spawn.stderr_buf = NULL;
   spawn.combine = 1;
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
