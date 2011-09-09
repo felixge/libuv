@@ -59,6 +59,7 @@ void debug(int r) {
   fprintf(stderr, "spawn.stderr_read: %i\n", spawn.stderr_read);
   fprintf(stderr, "spawn.stderr_size: %i\n", spawn.stderr_size);
   fprintf(stderr, "spawn.stderr: %s\n", spawn.stderr_buf);
+  fprintf(stderr, "spawn.exit_timeout: %i\n", spawn.exit_timeout);
   fprintf(stderr, "spawn.exit_code: %i\n", spawn.exit_code);
   fprintf(stderr, "spawn.exit_signal: %i\n", spawn.exit_signal);
 }
@@ -70,6 +71,7 @@ TEST_IMPL(spawn_sync_exit_code) {
   init_process_options("spawn_helper1");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
 
   ASSERT(spawn.pid >= 0);
   ASSERT(r == 0);
@@ -86,6 +88,7 @@ TEST_IMPL(spawn_sync_exit_signal) {
   init_process_options("spawn_helper_suicide");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
 
   ASSERT(r == 0);
   ASSERT(spawn.exit_signal == SIGKILL);
@@ -103,7 +106,6 @@ TEST_IMPL(spawn_sync_stdio) {
   init_process_options("stdout_stderr");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
-
   debug(r);
 
   ASSERT(r == 0);
@@ -125,7 +127,6 @@ TEST_IMPL(spawn_sync_stdout) {
   spawn.stderr_buf = NULL;
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
-
   debug(r);
 
   ASSERT(r == 0);
@@ -146,7 +147,6 @@ TEST_IMPL(spawn_sync_stderr) {
   spawn.stdout_buf = NULL;
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
-
   debug(r);
 
   ASSERT(r == 0);
@@ -168,12 +168,28 @@ TEST_IMPL(spawn_sync_combine_stdio) {
   spawn.combine = 1;
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
-
   debug(r);
 
   ASSERT(r == 0);
   ASSERT(strcmp(spawn.stdout_buf, expected_stdout) == 0);
   ASSERT(spawn.stdout_read == strlen(expected_stdout));
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_timeout) {
+  int r;
+  uv_init();
+
+  init_process_options("spawn_helper4");
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(spawn.exit_timeout == 1);
+  ASSERT(spawn.exit_signal == -1);
+  ASSERT(spawn.exit_code == -1);
 
   return 0;
 }

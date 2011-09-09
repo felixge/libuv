@@ -287,17 +287,17 @@ int uv_process_kill(uv_process_t* process, int signum) {
   }
 }
 
-static int spawn_sync_pipe[2];
+static int sigchld_pipe[2];
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 void SyncCHLDHandler(int sig) {
   char c;
   assert(sig == SIGCHLD);
-  assert(spawn_sync_pipe[0] >= 0);
-  assert(spawn_sync_pipe[1] >= 0);
+  assert(sigchld_pipe[0] >= 0);
+  assert(sigchld_pipe[1] >= 0);
 
-  write(spawn_sync_pipe[1], &c, 1);
+  write(sigchld_pipe[1], &c, 1);
 }
 
 int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
@@ -314,6 +314,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   spawn->pid = -1;
   spawn->exit_code = -1;
   spawn->exit_signal = -1;
+  spawn->exit_timeout = 0;
   spawn->stdout_read = 0;
   spawn->stderr_read = 0;
 
@@ -327,7 +328,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
     return -1;
   }
 
-  if (pipe(spawn_sync_pipe)) {
+  if (pipe(sigchld_pipe)) {
     perror("pipe");
     return -1;
   }
@@ -360,7 +361,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   }
 
   /* parent */
-  nfds = spawn_sync_pipe[0];
+  nfds = sigchld_pipe[0];
 
   if (spawn->stdout_buf) {
     close(stdout_pipe[1]); /* close the write end */
@@ -400,7 +401,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       FD_SET(stderr_pipe[0], &pipes);
     }
 
-    FD_SET(spawn_sync_pipe[0], &pipes);
+    FD_SET(sigchld_pipe[0], &pipes);
 
     elapsed = uv_now(loop) - start_time;
     time_to_timeout = spawn->timeout - elapsed;
@@ -421,8 +422,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
     if (r == 0) {
       /* timeout */
-      close(spawn_sync_pipe[0]);
-      close(spawn_sync_pipe[1]);
+      close(sigchld_pipe[0]);
+      close(sigchld_pipe[1]);
 
       if (spawn->stdout_buf) {
         close(stdout_pipe[0]);
@@ -433,8 +434,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       }
 
       kill(spawn->pid, SIGKILL);
-      perror("timeout");
-      return -1;
+      spawn->exit_timeout = 1;
+      return 0;
     }
 
     if (spawn->stdout_buf && FD_ISSET(stdout_pipe[0], &pipes)) {
@@ -467,7 +468,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       spawn->stderr_read += r;
     }
 
-    if (FD_ISSET(spawn_sync_pipe[0], &pipes)) {
+    if (FD_ISSET(sigchld_pipe[0], &pipes)) {
       /* The child process has exited. */
       int status;
 
@@ -477,8 +478,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
         goto error;
       }
 
-      close(spawn_sync_pipe[0]);
-      close(spawn_sync_pipe[1]);
+      close(sigchld_pipe[0]);
+      close(sigchld_pipe[1]);
 
       if (spawn->stdout_buf) {
         close(stdout_pipe[0]);
@@ -503,8 +504,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   }
 
 error:
-  close(spawn_sync_pipe[0]);
-  close(spawn_sync_pipe[1]);
+  close(sigchld_pipe[0]);
+  close(sigchld_pipe[1]);
 
   if (spawn->stdout_buf) {
     close(stdout_pipe[0]);
