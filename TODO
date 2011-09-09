@@ -1,3 +1,5 @@
+* Support passing data into stdin
+
 * Do another read after SIGCHLD
 
 * Clean up code
