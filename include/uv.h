@@ -826,9 +826,13 @@ typedef struct uv_spawn_sync_t{
 
   int combine;
 
-  char *output;
-  int output_size;
-  int output_read;
+  char *stdout_buf;
+  int stdout_size;
+  int stdout_read;
+
+  char *stderr_buf;
+  int stderr_size;
+  int stderr_read;
 
   int pid;
   int exit_code;

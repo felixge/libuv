@@ -301,7 +301,8 @@ void SyncCHLDHandler(int sig) {
 }
 
 int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
-  int out_pipe[2];
+  int stdout_pipe[2];
+  int stderr_pipe[2];
   int nfds;
   int64_t start_time;
   struct sigaction siga;
@@ -313,9 +314,14 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   spawn->pid = -1;
   spawn->exit_code = -1;
   spawn->exit_signal = -1;
-  spawn->output_read = 0;
+  spawn->stdout_read = 0;
 
-  if (pipe(out_pipe)) {
+  if (pipe(stdout_pipe)) {
+    perror("pipe");
+    return -1;
+  }
+
+  if (pipe(stderr_pipe)) {
     perror("pipe");
     return -1;
   }
@@ -331,9 +337,12 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       return -1;
 
     case 0: /* child */
-      close(out_pipe[0]); /* close read end */
-      dup2(out_pipe[1], STDOUT_FILENO);
-      dup2(out_pipe[1], STDERR_FILENO);
+       /* close read ends */
+      close(stdout_pipe[0]);
+      close(stderr_pipe[0]);
+
+      dup2(stdout_pipe[1], STDOUT_FILENO);
+      dup2(stderr_pipe[1], STDERR_FILENO);
 
       execvp(spawn->file, spawn->args);
       perror("execvp()");
@@ -342,9 +351,11 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   }
 
   /* parent */
-  close(out_pipe[1]); /* close the write end of the pipe. */
+  /* close the write ends */
+  close(stdout_pipe[1]);
+  close(stderr_pipe[1]);
 
-  nfds = MAX(out_pipe[0], spawn_sync_pipe[0]) + 1;
+  nfds = MAX(MAX(stdout_pipe[0], stderr_pipe[0]), spawn_sync_pipe[0]) + 1;
   start_time = uv_now(loop); /* time in ms */
 
   /* Set up sighandling */
@@ -363,7 +374,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
     int r;
 
     FD_ZERO(&pipes);
-    FD_SET(out_pipe[0], &pipes);
+    FD_SET(stdout_pipe[0], &pipes);
+    FD_SET(stderr_pipe[0], &pipes);
     FD_SET(spawn_sync_pipe[0], &pipes);
 
     elapsed = uv_now(loop) - start_time;
@@ -387,25 +399,41 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       /* timeout */
       close(spawn_sync_pipe[0]);
       close(spawn_sync_pipe[1]);
-      close(out_pipe[0]);
+      close(stdout_pipe[0]);
+      close(stderr_pipe[0]);
       kill(spawn->pid, SIGKILL);
       perror("timeout");
       return -1;
     }
 
-    if (FD_ISSET(out_pipe[0], &pipes)) {
+    if (FD_ISSET(stdout_pipe[0], &pipes)) {
       /* Check for buffer overflow. */
-      if (spawn->output_size - spawn->output_read <= 0) {
+      if (spawn->stdout_size - spawn->stdout_read <= 0) {
         perror("buffer overflow");
         goto error;
       }
-      r = read(out_pipe[0], spawn->output + spawn->output_read, spawn->output_size - spawn->output_read);
+      r = read(stdout_pipe[0], spawn->stdout_buf + spawn->stdout_read, spawn->stdout_size - spawn->stdout_read);
       if (r == -1) {
         perror("read");
         goto error;
       }
 
-      spawn->output_read += r;
+      spawn->stdout_read += r;
+    }
+
+    if (FD_ISSET(stderr_pipe[0], &pipes)) {
+      /* Check for buffer overflow. */
+      if (spawn->stderr_size - spawn->stderr_read <= 0) {
+        perror("buffer overflow");
+        goto error;
+      }
+      r = read(stderr_pipe[0], spawn->stderr_buf + spawn->stderr_read, spawn->stderr_size - spawn->stderr_read);
+      if (r == -1) {
+        perror("read");
+        goto error;
+      }
+
+      spawn->stderr_read += r;
     }
 
     if (FD_ISSET(spawn_sync_pipe[0], &pipes)) {
@@ -420,7 +448,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 
       close(spawn_sync_pipe[0]);
       close(spawn_sync_pipe[1]);
-      close(out_pipe[0]);
+      close(stdout_pipe[0]);
+      close(stderr_pipe[0]);
 
       if (WIFEXITED(status)) {
         spawn->exit_code = WEXITSTATUS(status);
@@ -439,7 +468,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 error:
   close(spawn_sync_pipe[0]);
   close(spawn_sync_pipe[1]);
-  close(out_pipe[0]);
+  close(stdout_pipe[0]);
+  close(stderr_pipe[0]);
   kill(spawn->pid, SIGKILL);
   return -1;
 }
