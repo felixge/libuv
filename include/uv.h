@@ -815,26 +815,27 @@ struct uv_process_s {
 /* Initializes uv_process_t and starts the process. */
 int uv_spawn(uv_loop_t*, uv_process_t*, uv_process_options_t options);
 
-/* uv_spawn_sync() options */
-typedef struct uv_sync_process_options_s {
+typedef struct uv_spawn_sync_t{
   const char* file; /* Path to program to execute. */
   /*
    * Command line arguments. args[0] should be the path to the program.
    */
   char** args;
-} uv_sync_process_options_t;
 
-/*
- * uv_process_t is not a subclass of uv_handle_t
- */
-struct uv_sync_process_s {
-  pid_t pid;
+  int64_t timeout;
+
+  int combine;
+
+  char *output;
+  int output_size;
+  int output_read;
+
+  int pid;
   int exit_code;
-};
+  int exit_signal;
+} uv_spawn_sync_t;
 
-/* Initializes uv_sync_process_t and executes the process. */
-int uv_spawn_sync(uv_loop_t*, uv_sync_process_t*,
-    uv_sync_process_options_t options);
+int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn_sync);
 
 
 /*

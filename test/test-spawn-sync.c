@@ -26,8 +26,7 @@
 
 static char exepath[1024];
 static size_t exepath_size = 1024;
-static uv_sync_process_t process;
-static uv_sync_process_options_t options = { 0 };
+static uv_spawn_sync_t spawn;
 static char* args[3];
 
 static void init_process_options(char* test) {
@@ -39,8 +38,22 @@ static void init_process_options(char* test) {
   args[1] = test;
   args[2] = NULL;
 
-  options.file = exepath;
-  options.args = args;
+  spawn.combine = 0;
+  spawn.timeout = 1000;
+  spawn.file = exepath;
+  spawn.args = args;
+  spawn.output_size = 1024;
+  spawn.output = malloc(spawn.output_size);
+}
+
+void debug(int r) {
+  fprintf(stderr, "r: %i\n", r);
+  fprintf(stderr, "spawn.pid: %i\n", spawn.pid);
+  fprintf(stderr, "spawn.output_read: %i\n", spawn.output_read);
+  fprintf(stderr, "spawn.output_size: %i\n", spawn.output_size);
+  fprintf(stderr, "spawn.output: %s\n", spawn.output);
+  fprintf(stderr, "spawn.exit_code: %i\n", spawn.exit_code);
+  fprintf(stderr, "spawn.exit_signal: %i\n", spawn.exit_signal);
 }
 
 TEST_IMPL(spawn_sync_exit_code) {
@@ -49,13 +62,47 @@ TEST_IMPL(spawn_sync_exit_code) {
 
   init_process_options("spawn_helper1");
 
-  r = uv_spawn_sync(uv_default_loop(), &process, options);
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
 
-  ASSERT(process.pid >= 0);
+  ASSERT(spawn.pid >= 0);
   ASSERT(r == 0);
-  ASSERT(process.exit_code == 1);
+  ASSERT(spawn.exit_code == 1);
+  ASSERT(spawn.exit_signal == -1);
 
-  fprintf(stdout, "Fuck!\n");
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_exit_signal) {
+  int r;
+  uv_init();
+
+  init_process_options("spawn_helper_suicide");
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+
+  ASSERT(r == 0);
+  ASSERT(spawn.exit_signal == SIGKILL);
+  ASSERT(spawn.exit_code == -1);
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_combine_stdio) {
+  int r;
+  char *expected_output = "stdout\nstderr\n";
+  uv_init();
+
+  init_process_options("stdout_stderr");
+
+  spawn.combine = 1;
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(strcmp(spawn.output, expected_output) == 0);
+  ASSERT(spawn.output_read == strlen(expected_output));
 
   return 0;
 }

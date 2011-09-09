@@ -287,24 +287,159 @@ int uv_process_kill(uv_process_t* process, int signum) {
   }
 }
 
-int uv_spawn_sync(uv_loop_t* loop, uv_sync_process_t* process,
-    uv_sync_process_options_t options) {
+static int spawn_sync_pipe[2];
 
-  pid_t pid;
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-  switch (pid = fork()) {
+void SyncCHLDHandler(int sig) {
+  char c;
+  assert(sig == SIGCHLD);
+  assert(spawn_sync_pipe[0] >= 0);
+  assert(spawn_sync_pipe[1] >= 0);
+
+  write(spawn_sync_pipe[1], &c, 1);
+}
+
+int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
+  int out_pipe[2];
+  int nfds;
+  int64_t start_time;
+  struct sigaction siga;
+  static sigset_t sigset;
+  fd_set pipes;
+
+  struct timeval select_timeout;
+
+  spawn->pid = -1;
+  spawn->exit_code = -1;
+  spawn->exit_signal = -1;
+  spawn->output_read = 0;
+
+  if (pipe(out_pipe)) {
+    perror("pipe");
+    return -1;
+  }
+
+  if (pipe(spawn_sync_pipe)) {
+    perror("pipe");
+    return -1;
+  }
+
+  switch (spawn->pid = fork()) {
     case -1:
       perror("fork");
       return -1;
 
-    case 0: /* Child */
-      execvp(options.file, options.args);
+    case 0: /* child */
+      close(out_pipe[0]); /* close read end */
+      dup2(out_pipe[1], STDOUT_FILENO);
+      dup2(out_pipe[1], STDERR_FILENO);
+
+      execvp(spawn->file, spawn->args);
       perror("execvp()");
       _exit(127);
       break;
   }
 
-  process->pid = pid;
+  /* parent */
+  close(out_pipe[1]); /* close the write end of the pipe. */
 
-  return 0;
+  nfds = MAX(out_pipe[0], spawn_sync_pipe[0]) + 1;
+  start_time = uv_now(loop); /* time in ms */
+
+  /* Set up sighandling */
+  sigfillset(&sigset);
+  siga.sa_handler = SyncCHLDHandler;
+  siga.sa_mask = sigset;
+  siga.sa_flags = 0;
+  if (sigaction(SIGCHLD, &siga, (struct sigaction *)NULL) != 0) {
+    perror("sigaction");
+    goto error;
+  }
+
+  while (1) {
+    int64_t elapsed;
+    int64_t time_to_timeout;
+    int r;
+
+    FD_ZERO(&pipes);
+    FD_SET(out_pipe[0], &pipes);
+    FD_SET(spawn_sync_pipe[0], &pipes);
+
+    elapsed = uv_now(loop) - start_time;
+    time_to_timeout = spawn->timeout - elapsed;
+
+    select_timeout.tv_sec = time_to_timeout / 1000;
+    select_timeout.tv_usec = time_to_timeout % 1000;
+
+    r = select(nfds, &pipes, NULL, NULL, &select_timeout);
+
+    if (r == -1) {
+      if (errno == EINTR) {
+        continue;
+      }
+
+      perror("select");
+      goto error;
+    }
+
+    if (r == 0) {
+      /* timeout */
+      close(spawn_sync_pipe[0]);
+      close(spawn_sync_pipe[1]);
+      close(out_pipe[0]);
+      kill(spawn->pid, SIGKILL);
+      perror("timeout");
+      return -1;
+    }
+
+    if (FD_ISSET(out_pipe[0], &pipes)) {
+      /* Check for buffer overflow. */
+      if (spawn->output_size - spawn->output_read <= 0) {
+        perror("buffer overflow");
+        goto error;
+      }
+      r = read(out_pipe[0], spawn->output + spawn->output_read, spawn->output_size - spawn->output_read);
+      if (r == -1) {
+        perror("read");
+        goto error;
+      }
+
+      spawn->output_read += r;
+    }
+
+    if (FD_ISSET(spawn_sync_pipe[0], &pipes)) {
+      /* The child process has exited. */
+      int status;
+
+      pid_t p = wait(&status);
+      if (p < 0) {
+        perror("wait");
+        goto error;
+      }
+
+      close(spawn_sync_pipe[0]);
+      close(spawn_sync_pipe[1]);
+      close(out_pipe[0]);
+
+      if (WIFEXITED(status)) {
+        spawn->exit_code = WEXITSTATUS(status);
+      }
+
+      if (WIFSIGNALED(status)) {
+        spawn->exit_signal = WTERMSIG(status);
+      }
+
+      return 0;
+    }
+
+    uv_update_time(loop);
+  }
+
+error:
+  close(spawn_sync_pipe[0]);
+  close(spawn_sync_pipe[1]);
+  close(out_pipe[0]);
+  kill(spawn->pid, SIGKILL);
+  return -1;
 }

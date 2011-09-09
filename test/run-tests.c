@@ -76,5 +76,17 @@ static int maybe_run_test(int argc, char **argv) {
     while (1) uv_sleep(10000);
   }
 
+  if (strcmp(argv[1], "spawn_helper_suicide") == 0) {
+    kill(getpid(), SIGKILL);
+    while (1) uv_sleep(10000);
+    return 0;
+  }
+
+  if (strcmp(argv[1], "stdout_stderr") == 0) {
+    fprintf(stdout, "stdout\n");
+    fprintf(stderr, "stderr\n");
+    return 0;
+  }
+
   return run_test(argv[1], TEST_TIMEOUT, 0);
 }
