@@ -95,7 +95,7 @@ void write_cb(uv_write_t* req, int status) {
 
 
 static void init_process_options(char* test, uv_exit_cb exit_cb) {
-  /* Note spawn_helper1 defined in test/run-tests.c */
+  /* Note spawn_helper_exit_code defined in test/run-tests.c */
   int r = uv_exepath(exepath, &exepath_size);
   ASSERT(r == 0);
   exepath[exepath_size] = '\0';
@@ -119,7 +119,7 @@ TEST_IMPL(spawn_exit_code) {
 
   uv_init();
 
-  init_process_options("spawn_helper1", exit_cb);
+  init_process_options("spawn_helper_exit_code", exit_cb);
 
   r = uv_spawn(uv_default_loop(), &process, options);
   ASSERT(r == 0);
@@ -140,7 +140,7 @@ TEST_IMPL(spawn_stdout) {
 
   uv_init();
 
-  init_process_options("spawn_helper2", exit_cb);
+  init_process_options("spawn_helper_stdout", exit_cb);
 
   uv_pipe_init(uv_default_loop(), &out);
   options.stdout_stream = &out;
@@ -173,7 +173,7 @@ int r;
 
   uv_init();
 
-  init_process_options("spawn_helper3", exit_cb);
+  init_process_options("spawn_helper_stdin", exit_cb);
 
   uv_pipe_init(uv_default_loop(), &out);
   uv_pipe_init(uv_default_loop(), &in);
@@ -207,7 +207,7 @@ TEST_IMPL(spawn_and_kill) {
 
   uv_init();
 
-  init_process_options("spawn_helper4", kill_cb);
+  init_process_options("spawn_helper_timeout", kill_cb);
 
   r = uv_spawn(uv_default_loop(), &process, options);
   ASSERT(r == 0);
@@ -237,7 +237,7 @@ TEST_IMPL(spawn_detect_pipe_name_collisions_on_windows) {
 
   uv_init();
 
-  init_process_options("spawn_helper2", exit_cb);
+  init_process_options("spawn_helper_stdout", exit_cb);
 
   uv_pipe_init(uv_default_loop(), &out);
   options.stdout_stream = &out;

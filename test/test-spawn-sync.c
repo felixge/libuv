@@ -31,7 +31,7 @@ static uv_spawn_sync_t spawn;
 static char* args[3];
 
 static void init_process_options(char* test) {
-  /* Note spawn_helper1 defined in test/run-tests.c */
+  /* Note spawn_helper_exit_code defined in test/run-tests.c */
   int r = uv_exepath(exepath, &exepath_size);
   ASSERT(r == 0);
   exepath[exepath_size] = '\0';
@@ -73,7 +73,7 @@ TEST_IMPL(spawn_sync_exit_code) {
   int r;
   uv_init();
 
-  init_process_options("spawn_helper1");
+  init_process_options("spawn_helper_exit_code");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);
@@ -90,7 +90,7 @@ TEST_IMPL(spawn_sync_exit_signal) {
   int r;
   uv_init();
 
-  init_process_options("spawn_helper_suicide");
+  init_process_options("spawn_helper_exit_signal");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);
@@ -222,7 +222,7 @@ TEST_IMPL(spawn_sync_timeout) {
   int r;
   uv_init();
 
-  init_process_options("spawn_helper4");
+  init_process_options("spawn_helper_timeout");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);

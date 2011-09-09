@@ -54,16 +54,16 @@ static int maybe_run_test(int argc, char **argv) {
     return 0;
   }
 
-  if (strcmp(argv[1], "spawn_helper1") == 0) {
+  if (strcmp(argv[1], "spawn_helper_exit_code") == 0) {
     return 1;
   }
 
-  if (strcmp(argv[1], "spawn_helper2") == 0) {
+  if (strcmp(argv[1], "spawn_helper_stdout") == 0) {
     printf("hello world\n");
     return 1;
   }
 
-  if (strcmp(argv[1], "spawn_helper3") == 0) {
+  if (strcmp(argv[1], "spawn_helper_stdin") == 0) {
     char buffer[256];
     fgets(buffer, sizeof(buffer) - 1, stdin);
     buffer[sizeof(buffer) - 1] = '\0';
@@ -71,12 +71,12 @@ static int maybe_run_test(int argc, char **argv) {
     return 1;
   }
 
-  if (strcmp(argv[1], "spawn_helper4") == 0) {
+  if (strcmp(argv[1], "spawn_helper_timeout") == 0) {
     /* Never surrender, never return! */
     while (1) uv_sleep(10000);
   }
 
-  if (strcmp(argv[1], "spawn_helper_suicide") == 0) {
+  if (strcmp(argv[1], "spawn_helper_exit_signal") == 0) {
     kill(getpid(), SIGKILL);
     while (1) uv_sleep(10000);
     return 0;
