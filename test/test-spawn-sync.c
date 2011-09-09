@@ -51,6 +51,7 @@ static void init_process_options(char* test) {
 }
 
 void debug(int r) {
+  fprintf(stderr, "----------------------------------------\n");
   fprintf(stderr, "r: %i\n", r);
   fprintf(stderr, "spawn.pid: %i\n", spawn.pid);
   fprintf(stderr, "spawn.stdout_read: %i\n", spawn.stdout_read);
@@ -62,6 +63,10 @@ void debug(int r) {
   fprintf(stderr, "spawn.exit_timeout: %i\n", spawn.exit_timeout);
   fprintf(stderr, "spawn.exit_code: %i\n", spawn.exit_code);
   fprintf(stderr, "spawn.exit_signal: %i\n", spawn.exit_signal);
+
+  uv_err_t err = uv_last_error(uv_default_loop());
+  fprintf(stderr, "uv_last_error_name: %s\n", uv_err_name(err));
+  fprintf(stderr, "----------------------------------------\n");
 }
 
 TEST_IMPL(spawn_sync_exit_code) {
@@ -168,8 +173,9 @@ TEST_IMPL(spawn_sync_stdout_overflow) {
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);
 
-  ASSERT(r == 0);
+  ASSERT(r == -1);
   ASSERT(spawn.stdout_read == spawn.stdout_size);
+  ASSERT(uv_last_error(uv_default_loop()).code == UV_ENOBUFS);
 
   return 0;
 }
@@ -185,8 +191,9 @@ TEST_IMPL(spawn_sync_stderr_overflow) {
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);
 
-  ASSERT(r == 0);
+  ASSERT(r == -1);
   ASSERT(spawn.stderr_read == spawn.stderr_size);
+  ASSERT(uv_last_error(uv_default_loop()).code == UV_ENOBUFS);
 
   return 0;
 }
