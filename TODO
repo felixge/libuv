@@ -3,3 +3,26 @@
 * Do another read after SIGCHLD
 
 * Clean up code
+
+* stderr buffer overflow race:
+
+    make test/run-tests && ./test/run-tests spawn_sync_stderr_overflow spawn_sync_stderr_overflow
+    make: `test/run-tests' is up to date.
+    ----------------------------------------
+    r: 0
+    spawn.pid: 85339
+    spawn.stdout_read: 7
+    spawn.stdout_size: 1024
+    spawn.stdout: stdout
+
+    spawn.stderr_read: 1
+    spawn.stderr_size: 1
+    spawn.stderr: s
+    spawn.exit_timeout: 0
+    spawn.exit_code: 0
+    spawn.exit_signal: -1
+    uv_last_error_name: OK
+    ----------------------------------------
+    Assertion failed in test/test-spawn-sync.c on line 194: r == -1
+    Abort trap
+
