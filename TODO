@@ -26,3 +26,8 @@
     Assertion failed in test/test-spawn-sync.c on line 194: r == -1
     Abort trap
 
+* Comment struct in header (input values, vs. output values), general description
+
+* Stub out uv_spawn_sync() in src/win/process.c with assert(0 && "implement me");
+
+* Add test file to uv.gyp and test it (instructions in readme)
