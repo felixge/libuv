@@ -31,3 +31,5 @@
 * Stub out uv_spawn_sync() in src/win/process.c with assert(0 && "implement me");
 
 * Add test file to uv.gyp and test it (instructions in readme)
+
+* stdout_stderr -> rename to proper spawn helper
