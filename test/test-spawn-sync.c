@@ -108,7 +108,7 @@ TEST_IMPL(spawn_sync_stdio) {
   char *expected_stderr = "stderr\n";
   uv_init();
 
-  init_process_options("stdout_stderr");
+  init_process_options("spawn_helper_stdout_stderr");
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);
@@ -127,7 +127,7 @@ TEST_IMPL(spawn_sync_stdout) {
   char *expected_stdout = "stdout\n";
   uv_init();
 
-  init_process_options("stdout_stderr");
+  init_process_options("spawn_helper_stdout_stderr");
 
   spawn.stderr_buf = NULL;
 
@@ -147,7 +147,7 @@ TEST_IMPL(spawn_sync_stderr) {
   char *expected_stderr = "stderr\n";
   uv_init();
 
-  init_process_options("stdout_stderr");
+  init_process_options("spawn_helper_stdout_stderr");
 
   spawn.stdout_buf = NULL;
 
@@ -166,7 +166,7 @@ TEST_IMPL(spawn_sync_stdout_overflow) {
   int r;
   uv_init();
 
-  init_process_options("stdout_stderr");
+  init_process_options("spawn_helper_stdout_stderr");
 
   spawn.stdout_size = 1;
 
@@ -184,7 +184,7 @@ TEST_IMPL(spawn_sync_stderr_overflow) {
   int r;
   uv_init();
 
-  init_process_options("stdout_stderr");
+  init_process_options("spawn_helper_stdout_stderr");
 
   spawn.stderr_size = 1;
 
@@ -203,7 +203,7 @@ TEST_IMPL(spawn_sync_combine_stdio) {
   char *expected_stdout = "stdout\nstderr\n";
   uv_init();
 
-  init_process_options("stdout_stderr");
+  init_process_options("spawn_helper_stdout_stderr");
 
   spawn.stderr_buf = NULL;
   spawn.combine = 1;

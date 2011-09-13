@@ -82,7 +82,7 @@ static int maybe_run_test(int argc, char **argv) {
     return 0;
   }
 
-  if (strcmp(argv[1], "stdout_stderr") == 0) {
+  if (strcmp(argv[1], "spawn_helper_stdout_stderr") == 0) {
     fprintf(stdout, "stdout\n");
     fprintf(stderr, "stderr\n");
     return 0;
