@@ -301,6 +301,7 @@ void SyncCHLDHandler(int sig) {
 }
 
 int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
+  int stdin_pipe[2];
   int stdout_pipe[2];
   int stderr_pipe[2];
   int nfds;
@@ -317,6 +318,11 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   spawn->exit_timeout = 0;
   spawn->stdout_read = 0;
   spawn->stderr_read = 0;
+
+  if (spawn->stdin_buf && pipe(stdin_pipe)) {
+    uv_err_new(loop, errno);
+    return -1;
+  }
 
   if (spawn->stdout_buf && pipe(stdout_pipe)) {
     uv_err_new(loop, errno);
@@ -339,6 +345,11 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       return -1;
 
     case 0: /* child */
+      if (spawn->stdin_buf) {
+        close(stdin_pipe[1]); /* close write end */
+        dup2(stdin_pipe[0], STDIN_FILENO);
+      }
+
       if (spawn->stdout_buf) {
         close(stdout_pipe[0]); /* close read end */
         dup2(stdout_pipe[1], STDOUT_FILENO);
@@ -371,6 +382,11 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   if (spawn->stderr_buf) {
     close(stderr_pipe[1]); /* close the write end */
     nfds = MAX(nfds, stderr_pipe[0]);
+  }
+
+  if (spawn->stdin_buf) {
+    int c = write(stdin_pipe[1], spawn->stdin_buf, spawn->stdin_size);
+    close(stdin_pipe[0]); /* close the read end */
   }
 
   nfds = nfds + 1;
@@ -424,6 +440,10 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       /* timeout */
       close(sigchld_pipe[0]);
       close(sigchld_pipe[1]);
+
+      if (spawn->stdin_buf) {
+        close(stdin_pipe[1]);
+      }
 
       if (spawn->stdout_buf) {
         close(stdout_pipe[0]);
@@ -485,6 +505,10 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       close(sigchld_pipe[0]);
       close(sigchld_pipe[1]);
 
+      if (spawn->stdin_buf) {
+        close(stdin_pipe[1]);
+      }
+
       if (spawn->stdout_buf) {
         close(stdout_pipe[0]);
       }
@@ -510,6 +534,10 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
 error:
   close(sigchld_pipe[0]);
   close(sigchld_pipe[1]);
+
+  if (spawn->stdin_buf) {
+    close(stdin_pipe[1]);
+  }
 
   if (spawn->stdout_buf) {
     close(stdout_pipe[0]);

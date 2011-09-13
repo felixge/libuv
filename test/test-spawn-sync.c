@@ -47,7 +47,7 @@ static void init_process_options(char* test) {
   spawn.stdout_size = 1024;
   spawn.stdout_buf = malloc(spawn.stdout_size);
   spawn.stderr_size = 1024;
-  spawn.stderr_buf = malloc(spawn.stdout_size);
+  spawn.stderr_buf = malloc(spawn.stderr_size);
 }
 
 void debug(int r) {
@@ -214,6 +214,25 @@ TEST_IMPL(spawn_sync_combine_stdio) {
   ASSERT(r == 0);
   ASSERT(strcmp(spawn.stdout_buf, expected_stdout) == 0);
   ASSERT(spawn.stdout_read == strlen(expected_stdout));
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_stdin) {
+  int r;
+  uv_init();
+
+  init_process_options("spawn_helper_stdin");
+
+  spawn.stdin_buf = "stdin\n";
+  spawn.stdin_size = strlen(spawn.stdin_buf);
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(strcmp(spawn.stdout_buf, spawn.stdin_buf) == 0);
+  ASSERT(spawn.stdout_read == strlen(spawn.stdin_buf));
 
   return 0;
 }
