@@ -60,12 +60,14 @@ void debug(int r) {
   fprintf(stderr, "spawn.stderr_read: %i\n", spawn.stderr_read);
   fprintf(stderr, "spawn.stderr_size: %i\n", spawn.stderr_size);
   fprintf(stderr, "spawn.stderr: %s\n", spawn.stderr_buf);
+  fprintf(stderr, "spawn.stdin_written: %i\n", spawn.stdin_written);
   fprintf(stderr, "spawn.exit_timeout: %i\n", spawn.exit_timeout);
   fprintf(stderr, "spawn.exit_code: %i\n", spawn.exit_code);
   fprintf(stderr, "spawn.exit_signal: %i\n", spawn.exit_signal);
 
   uv_err_t err = uv_last_error(uv_default_loop());
   fprintf(stderr, "uv_last_error_name: %s\n", uv_err_name(err));
+  fprintf(stderr, "uv_strerror: %s\n", uv_strerror(err));
   fprintf(stderr, "----------------------------------------\n");
 }
 
@@ -223,6 +225,25 @@ TEST_IMPL(spawn_sync_stdin) {
   uv_init();
 
   init_process_options("spawn_helper_stdin");
+
+  spawn.stdin_buf = "stdin\n";
+  spawn.stdin_size = strlen(spawn.stdin_buf);
+
+  r = uv_spawn_sync(uv_default_loop(), &spawn);
+  debug(r);
+
+  ASSERT(r == 0);
+  ASSERT(strcmp(spawn.stdout_buf, spawn.stdin_buf) == 0);
+  ASSERT(spawn.stdout_read == strlen(spawn.stdin_buf));
+
+  return 0;
+}
+
+TEST_IMPL(spawn_sync_stdin_stream) {
+  int r;
+  uv_init();
+
+  init_process_options("spawn_helper_stdin_stream");
 
   spawn.stdin_buf = "stdin\n";
   spawn.stdin_size = strlen(spawn.stdin_buf);

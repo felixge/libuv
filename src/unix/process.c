@@ -308,7 +308,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   int64_t start_time;
   struct sigaction siga;
   static sigset_t sigset;
-  fd_set pipes;
+  fd_set read_fds;
+  fd_set write_fds;
 
   struct timeval select_timeout;
 
@@ -385,8 +386,8 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
   }
 
   if (spawn->stdin_buf) {
-    int c = write(stdin_pipe[1], spawn->stdin_buf, spawn->stdin_size);
     close(stdin_pipe[0]); /* close the read end */
+    nfds = MAX(nfds, stdin_pipe[1]);
   }
 
   nfds = nfds + 1;
@@ -407,25 +408,34 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
     int64_t time_to_timeout;
     int r;
 
-    FD_ZERO(&pipes);
+    FD_ZERO(&read_fds);
+    FD_ZERO(&write_fds);
 
     if (spawn->stdout_buf) {
-      FD_SET(stdout_pipe[0], &pipes);
+      FD_SET(stdout_pipe[0], &read_fds);
     }
 
     if (spawn->stderr_buf) {
-      FD_SET(stderr_pipe[0], &pipes);
+      FD_SET(stderr_pipe[0], &read_fds);
     }
 
-    FD_SET(sigchld_pipe[0], &pipes);
+    if (spawn->stdin_buf) {
+      FD_SET(stdin_pipe[1], &write_fds);
+    }
+
+    FD_SET(sigchld_pipe[0], &read_fds);
 
     elapsed = uv_now(loop) - start_time;
     time_to_timeout = spawn->timeout - elapsed;
+    if (time_to_timeout < 0) {
+      /* TODO: is this the right thing todo, or does this mean we timed out? */
+      time_to_timeout = 0;
+    }
 
     select_timeout.tv_sec = time_to_timeout / 1000;
     select_timeout.tv_usec = time_to_timeout % 1000;
 
-    r = select(nfds, &pipes, NULL, NULL, &select_timeout);
+    r = select(nfds, &read_fds, &write_fds, NULL, &select_timeout);
 
     if (r == -1) {
       if (errno == EINTR) {
@@ -458,7 +468,18 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       return 0;
     }
 
-    if (spawn->stdout_buf && FD_ISSET(stdout_pipe[0], &pipes)) {
+    if (spawn->stdin_buf && FD_ISSET(stdin_pipe[1], &write_fds) && spawn->stdin_written < spawn->stdin_size) {
+      int written = write(stdin_pipe[1], spawn->stdin_buf + spawn->stdin_written, spawn->stdin_size - spawn->stdin_written);
+
+      if (written == -1 && errno != EINTR) {
+        uv_err_new(loop, errno);
+        goto error;
+      } else {
+        spawn->stdin_written += written;
+      }
+    }
+
+    if (spawn->stdout_buf && FD_ISSET(stdout_pipe[0], &read_fds)) {
       if (spawn->stdout_size - spawn->stdout_read <= 0) {
         /* Check for buffer overflow. */
         uv_err_new_artificial(loop, UV_ENOBUFS);
@@ -476,7 +497,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       spawn->stdout_read += r;
     }
 
-    if (spawn->stderr_buf && FD_ISSET(stderr_pipe[0], &pipes)) {
+    if (spawn->stderr_buf && FD_ISSET(stderr_pipe[0], &read_fds)) {
       if (spawn->stderr_size - spawn->stderr_read <= 0) {
         /* Check for buffer overflow. */
         uv_err_new_artificial(loop, UV_ENOBUFS);
@@ -492,7 +513,7 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
       spawn->stderr_read += r;
     }
 
-    if (FD_ISSET(sigchld_pipe[0], &pipes)) {
+    if (FD_ISSET(sigchld_pipe[0], &read_fds)) {
       /* The child process has exited. */
       int status;
 

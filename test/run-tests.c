@@ -71,6 +71,18 @@ static int maybe_run_test(int argc, char **argv) {
     return 1;
   }
 
+  if (strcmp(argv[1], "spawn_helper_stdin_stream") == 0) {
+    char buffer[4];
+    fgets(buffer, sizeof(buffer), stdin);
+    fputs(buffer, stdout);
+
+    uv_sleep(1000);
+
+    fgets(buffer, sizeof(buffer), stdin);
+    fputs(buffer, stdout);
+    return 1;
+  }
+
   if (strcmp(argv[1], "spawn_helper_timeout") == 0) {
     /* Never surrender, never return! */
     while (1) uv_sleep(10000);
