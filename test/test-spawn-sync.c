@@ -54,13 +54,22 @@ void debug(int r) {
   fprintf(stderr, "----------------------------------------\n");
   fprintf(stderr, "r: %i\n", r);
   fprintf(stderr, "spawn.pid: %i\n", spawn.pid);
+
   fprintf(stderr, "spawn.stdout_read: %i\n", spawn.stdout_read);
   fprintf(stderr, "spawn.stdout_size: %i\n", spawn.stdout_size);
-  fprintf(stderr, "spawn.stdout: %s\n", spawn.stdout_buf);
+  if (spawn.stdout_size < 1024) {
+    fprintf(stderr, "spawn.stdout: %s\n", spawn.stdout_buf);
+  }
+
   fprintf(stderr, "spawn.stderr_read: %i\n", spawn.stderr_read);
   fprintf(stderr, "spawn.stderr_size: %i\n", spawn.stderr_size);
-  fprintf(stderr, "spawn.stderr: %s\n", spawn.stderr_buf);
+  if (spawn.stderr_size < 1024) {
+    fprintf(stderr, "spawn.stderr: %s\n", spawn.stderr_buf);
+  }
+
+  fprintf(stderr, "spawn.stdin_size: %i\n", spawn.stdin_size);
   fprintf(stderr, "spawn.stdin_written: %i\n", spawn.stdin_written);
+
   fprintf(stderr, "spawn.exit_timeout: %i\n", spawn.exit_timeout);
   fprintf(stderr, "spawn.exit_code: %i\n", spawn.exit_code);
   fprintf(stderr, "spawn.exit_signal: %i\n", spawn.exit_signal);
@@ -245,15 +254,17 @@ TEST_IMPL(spawn_sync_stdin_stream) {
 
   init_process_options("spawn_helper_stdin_stream");
 
-  spawn.stdin_buf = "stdin\n";
-  spawn.stdin_size = strlen(spawn.stdin_buf);
+  spawn.stdin_size = 1024 * 1024 * 1024;
+  spawn.stdin_buf = malloc(spawn.stdin_size);
+  spawn.stdout_size = spawn.stdin_size;
+  spawn.stdout_buf = malloc(spawn.stdout_size);
 
   r = uv_spawn_sync(uv_default_loop(), &spawn);
   debug(r);
 
   ASSERT(r == 0);
-  ASSERT(strcmp(spawn.stdout_buf, spawn.stdin_buf) == 0);
-  ASSERT(spawn.stdout_read == strlen(spawn.stdin_buf));
+  /*ASSERT(strcmp(spawn.stdout_buf, spawn.stdin_buf) == 0);*/
+  ASSERT(spawn.stdout_read == spawn.stdin_size);
 
   return 0;
 }

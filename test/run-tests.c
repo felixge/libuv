@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include <unistd.h>
 #include "runner.h"
 #include "task.h"
 
@@ -72,14 +73,33 @@ static int maybe_run_test(int argc, char **argv) {
   }
 
   if (strcmp(argv[1], "spawn_helper_stdin_stream") == 0) {
-    char buffer[4];
-    fgets(buffer, sizeof(buffer), stdin);
-    fputs(buffer, stdout);
+    int nfds;
+    nfds = STDIN_FILENO + 1;
+    fd_set fds;
 
-    uv_sleep(1000);
+    struct timeval select_timeout;
+    select_timeout.tv_sec = 1;
+    select_timeout.tv_usec = 0;
 
-    fgets(buffer, sizeof(buffer), stdin);
-    fputs(buffer, stdout);
+
+    while(1) {
+      int r;
+
+      FD_ZERO(&fds);
+      FD_SET(STDIN_FILENO, &fds);
+
+      r = select(nfds, &fds, NULL, NULL, &select_timeout);
+
+      if (FD_ISSET(STDIN_FILENO, &fds)) {
+        char buf[1024];
+        int bytes_read = read(STDIN_FILENO, buf, sizeof(1024));
+        if (bytes_read > 0) {
+          write(STDIN_FILENO, buf, bytes_read);
+        }
+      }
+    }
+    /*fgets(buffer, sizeof(buffer), stdin);*/
+    /*fputs(buffer, stdout);*/
     return 1;
   }
 

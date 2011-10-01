@@ -469,11 +469,15 @@ int uv_spawn_sync(uv_loop_t* loop, uv_spawn_sync_t* spawn) {
     }
 
     if (spawn->stdin_buf && FD_ISSET(stdin_pipe[1], &write_fds) && spawn->stdin_written < spawn->stdin_size) {
+      fprintf(stderr, "write!\n");
       int written = write(stdin_pipe[1], spawn->stdin_buf + spawn->stdin_written, spawn->stdin_size - spawn->stdin_written);
+      fprintf(stderr, "wrote: %i\n", written);
 
-      if (written == -1 && errno != EINTR) {
-        uv_err_new(loop, errno);
-        goto error;
+      if (written == -1) {
+        if (errno != EINTR) {
+          uv_err_new(loop, errno);
+          goto error;
+        }
       } else {
         spawn->stdin_written += written;
       }
